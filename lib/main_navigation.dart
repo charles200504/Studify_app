@@ -3,7 +3,9 @@ import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/planner/screens/planner_screen.dart';
 import 'features/tracker/screens/assignment_tracker_screen.dart';
 import 'features/notes/screens/notes_screen.dart';
-import 'features/profile/screens/profile_screen.dart';
+
+// 1. Keep this commented out until your teammate fixes their class naming
+// import 'features/profile/screens/profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -15,7 +17,6 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
 
-  // Updates the state so the whole app switches tabs
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -24,16 +25,17 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> _screens = [
+    // 2. Renamed to 'screens' (removed underscore) to fix the warning
+    final List<Widget> screens = [
       DashboardScreen(onSeeAllPressed: _onItemTapped),
       const PlannerScreen(),
       const AssignmentTrackerScreen(),
       const NotesScreen(),
-      const ProfileScreen(),
+      const ProfilePlaceholder(), // 3. Use the placeholder for now
     ];
 
     return Scaffold(
-      body: _screens[_selectedIndex],
+      body: screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
@@ -47,6 +49,24 @@ class _MainNavigationState extends State<MainNavigation> {
           BottomNavigationBarItem(icon: Icon(Icons.notes), label: 'Notes'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
+      ),
+    );
+  }
+}
+
+// 4. TEMPORARY PLACEHOLDER: This keeps the app from crashing.
+// Once your friend fixes the ProfileScreen, delete this and the call above.
+class ProfilePlaceholder extends StatelessWidget {
+  const ProfilePlaceholder({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Text(
+          'Profile Screen Loading...\n(Waiting for group member update)',
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }
