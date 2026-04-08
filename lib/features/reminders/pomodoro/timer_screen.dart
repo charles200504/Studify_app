@@ -3,121 +3,238 @@ import 'package:flutter/material.dart';
 
 class TimerScreen extends StatefulWidget {
   const TimerScreen({super.key});
-
   @override
   State<TimerScreen> createState() => _TimerScreenState();
 }
 
 class _TimerScreenState extends State<TimerScreen> {
-  // Timer Logic Variables
   Timer? _timer;
-  int _secondsRemaining = 25 * 60; // 25 minutes
+  int _secondsRemaining = 1500;
+  int _totalSeconds = 1500;
   bool _isRunning = false;
+  String _currentMode = "Focus";
+
+  int _sessionsCompleted = 0;
+  int _totalMinutes = 0;
 
   void _toggleTimer() {
     if (_isRunning) {
       _timer?.cancel();
     } else {
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        setState(() {
-          if (_secondsRemaining > 0) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+        if (_secondsRemaining > 0) {
+          setState(() {
             _secondsRemaining--;
-          } else {
-            _timer?.cancel();
-            _isRunning = false;
-          }
-        });
+          });
+        } else {
+          _onTimerComplete();
+        }
       });
     }
     setState(() => _isRunning = !_isRunning);
   }
 
-  void _resetTimer() {
+  void _onTimerComplete() {
     _timer?.cancel();
     setState(() {
-      _secondsRemaining = 25 * 60;
       _isRunning = false;
+      if (_currentMode == "Focus") {
+        _sessionsCompleted++;
+        _totalMinutes += (_totalSeconds ~/ 60);
+      }
     });
   }
 
-  String _formatTime(int seconds) {
-    int minutes = seconds ~/ 60;
-    int secs = seconds % 60;
-    return "$minutes:${secs.toString().padLeft(2, '0')}";
+  void _resetTimer() {
+    _timer?.cancel();
+    setState(() {
+      _isRunning = false;
+      _setMode(_currentMode);
+    });
+  }
+
+  void _setMode(String mode) {
+    _timer?.cancel();
+    setState(() {
+      _currentMode = mode;
+      _isRunning = false;
+      if (mode == "Focus") {
+        _secondsRemaining = 1500;
+      } else if (mode == "Short Break") {
+        _secondsRemaining = 300;
+      } else {
+        _secondsRemaining = 900;
+      }
+      _totalSeconds = _secondsRemaining;
+    });
+  }
+
+  String _formatTime(int s) {
+    return "${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}";
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    const Color purpleTheme = Color(0xFF9181CB);
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F7F9),
       body: Column(
         children: [
-          // Header
+          // HEADER
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(15, 50, 25, 40),
+            padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
             decoration: const BoxDecoration(
-              color: Color(0xFF9E8CF2),
-              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
+              color: purpleTheme,
+              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(40), bottomRight: Radius.circular(40)),
             ),
-            child: Row(
+            child: Column(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20), onPressed: () => Navigator.pop(context)),
+                    const Text("Pomodoro Timer", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    const Icon(Icons.settings_outlined, color: Colors.white, size: 24),
+                  ],
                 ),
-                const Text("Pomodoro Timer", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 15),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildStatCard(_sessionsCompleted.toString(), "Sessions"),
+                    _buildStatCard(_totalMinutes.toString(), "Minutes"),
+                    _buildStatCard("1", "Until Break"),
+                  ],
+                ),
               ],
             ),
           ),
 
-          const Spacer(),
+          const SizedBox(height: 15),
 
-          // The Clock Circle
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 250,
-                height: 250,
-                child: CircularProgressIndicator(
-                  value: _secondsRemaining / (25 * 60),
-                  strokeWidth: 8,
-                  backgroundColor: Colors.grey[200],
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF9E8CF2)),
-                ),
-              ),
-              Text(
-                _formatTime(_secondsRemaining),
-                style: const TextStyle(fontSize: 60, fontWeight: FontWeight.bold, color: Color(0xFF3E4A89)),
-              ),
-            ],
+          // TABS (Mode Switcher)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _modeButton("Focus"),
+                _modeButton("Short Break"),
+                _modeButton("Long Break"),
+              ],
+            ),
           ),
 
-          const SizedBox(height: 50),
+          // MAIN TIMER CARD
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(25, 15, 25, 25),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [BoxShadow(color: Colors.black.withAlpha(15), blurRadius: 20, offset: const Offset(0, 10))],
+              ),
+              child: SingleChildScrollView( // Prevents overflow on smaller screens
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 20),
+                    Text("$_currentMode Time", style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                    Text(_formatTime(_secondsRemaining), style: const TextStyle(fontSize: 65, fontWeight: FontWeight.w400)),
+                    const SizedBox(height: 20),
 
-          // Controls
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: _toggleTimer,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isRunning ? Colors.orange : const Color(0xFF3E4A89),
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    // Progress Ring
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 180,
+                          height: 180,
+                          child: CircularProgressIndicator(
+                            value: _secondsRemaining / _totalSeconds,
+                            strokeWidth: 6,
+                            color: purpleTheme,
+                            backgroundColor: Colors.grey.shade100,
+                          ),
+                        ),
+                        const Column(
+                          children: [
+                            Icon(Icons.access_time_filled, color: Colors.grey, size: 35),
+                            Text("Keep Pushing", style: TextStyle(color: Colors.grey, fontSize: 11)),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    // THE BUTTONS
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        GestureDetector(
+                          onTap: _toggleTimer,
+                          child: Container(
+                            padding: const EdgeInsets.all(15),
+                            decoration: const BoxDecoration(color: purpleTheme, shape: BoxShape.circle),
+                            child: Icon(_isRunning ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 35),
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        GestureDetector(
+                          onTap: _resetTimer,
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
+                            child: const Icon(Icons.refresh, color: Colors.black54, size: 25),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                 ),
-                child: Text(_isRunning ? "Pause" : "Start", style: const TextStyle(color: Colors.white)),
               ),
-              const SizedBox(width: 20),
-              IconButton(
-                onPressed: _resetTimer,
-                icon: const Icon(Icons.refresh, size: 30, color: Colors.grey),
-              ),
-            ],
+            ),
           ),
+        ],
+      ),
+    );
+  }
 
-          const Spacer(),
+  Widget _modeButton(String mode) {
+    bool isActive = _currentMode == mode;
+    return GestureDetector(
+      onTap: () => _setMode(mode),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF9181CB) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isActive ? Colors.transparent : Colors.grey.shade200),
+        ),
+        child: Text(mode, style: TextStyle(color: isActive ? Colors.white : Colors.black54, fontWeight: FontWeight.bold, fontSize: 12)),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String value, String label) {
+    return Container(
+      width: 90,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+      child: Column(
+        children: [
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
         ],
       ),
     );
