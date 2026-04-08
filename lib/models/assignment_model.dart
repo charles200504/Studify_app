@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 
-enum AssignmentStatus { overdue, pending, done }
+enum AssignmentStatus { pending, done, overdue }
 
 class Assignment {
   final String title;
   final String subject;
-  final String dueDate;
-  final AssignmentStatus status;
+  final DateTime dueDate;
+  AssignmentStatus status;
   final Color color;
 
-  Assignment({required this.title, required this.subject, required this.dueDate, required this.status, required this.color});
+  Assignment({
+    required this.title,
+    required this.subject,
+    required this.dueDate,
+    required this.status,
+    required this.color,
+  });
 }
+
+// This list is now shared across the whole app
+List<Assignment> globalAssignments = [];
