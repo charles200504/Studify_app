@@ -1,28 +1,61 @@
 import 'package:flutter/material.dart';
+import 'edit_profile_screen.dart';
+import '../../auth/screens/login_screen.dart'; // Ensure this path is correct
 
-class EditProfileScreen extends StatefulWidget {
-  const EditProfileScreen({super.key});
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({super.key});
+
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
-  late TextEditingController _nameC;
-  late TextEditingController _emailC;
+class _ProfileScreenState extends State<ProfileScreen> {
+  String userName = "Alex Johnson";
+  String userEmail = "alex.j@study.com";
 
-  @override
-  void initState() {
-    super.initState();
-    // In a real app, you'd pass these values in, but we'll keep your defaults for now
-    _nameC = TextEditingController(text: "Alex Johnson");
-    _emailC = TextEditingController(text: "alex.j@study.com");
+  void _editProfile() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+    );
+
+    if (result != null && result is Map<String, String>) {
+      setState(() {
+        userName = result['name']!;
+        userEmail = result['email']!;
+      });
+    }
   }
 
-  @override
-  void dispose() {
-    _nameC.dispose();
-    _emailC.dispose();
-    super.dispose();
+  // --- FULLY WORKING LOGOUT ---
+  void _logout() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text("Are you sure you want to log out?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              // 1. Close the dialog first
+              Navigator.pop(context);
+
+              // 2. Clear all screens and go to Login
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    (route) => false, // This deletes the history so they can't go "back"
+              );
+            },
+            child: const Text("Logout", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -31,63 +64,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text("Edit Profile",
-            style: TextStyle(color: darkNavy, fontWeight: FontWeight.bold)),
-        leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: darkNavy),
-            onPressed: () => Navigator.pop(context)
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(25.0),
-        child: Column(
-          children: [
-            const CircleAvatar(
-                radius: 60,
-                backgroundColor: Color(0xFFF5F7F9),
-                child: Icon(Icons.camera_alt, size: 40, color: Colors.grey)
-            ),
-            const SizedBox(height: 40),
-            TextField(
-                controller: _nameC,
-                decoration: InputDecoration(
-                    labelText: "Full Name",
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))
-                )
-            ),
-            const SizedBox(height: 20),
-            TextField(
-                controller: _emailC,
-                decoration: InputDecoration(
-                    labelText: "Email Address",
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))
-                )
-            ),
-            const SizedBox(height: 100),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: darkNavy,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.only(top: 60, bottom: 30),
+            width: double.infinity,
+            color: darkNavy,
+            child: Column(
+              children: [
+                const CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.person, size: 50, color: darkNavy)
                 ),
-                onPressed: () {
-                  // PACK THE DATA and send it back to ProfileScreen
-                  Navigator.pop(context, {
-                    'name': _nameC.text,
-                    'email': _emailC.text,
-                  });
-                },
-                child: const Text("Save Changes",
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
+                const SizedBox(height: 15),
+                Text(userName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                Text(userEmail, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 10),
+          ListTile(
+            leading: const Icon(Icons.edit, color: darkNavy),
+            title: const Text("Edit Profile"),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: _editProfile,
+          ),
+          const Divider(height: 1, indent: 20, endIndent: 20),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.redAccent),
+            title: const Text("Logout", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            onTap: _logout,
+          ),
+        ],
       ),
     );
   }
