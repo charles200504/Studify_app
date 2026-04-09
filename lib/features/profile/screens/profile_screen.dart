@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'edit_profile_screen.dart';
-import '../../auth/screens/login_screen.dart'; // Ensure this path is correct
+import '../../auth/screens/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -10,21 +12,34 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String userName = "Alex Johnson";
-  String userEmail = "alex.j@study.com";
+  String userName = "Loading...";
+  String userEmail = "Loading...";
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots()
+          .listen((snapshot) {
+        if (mounted && snapshot.exists) {
+          setState(() {
+            userName = snapshot.data()?['name'] ?? "Alex Johnson";
+            userEmail = snapshot.data()?['email'] ?? user.email ?? "alex.j@study.com";
+          });
+        }
+      });
+    }
+  }
 
   void _editProfile() async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const EditProfileScreen()),
     );
-
-    if (result != null && result is Map<String, String>) {
-      setState(() {
-        userName = result['name']!;
-        userEmail = result['email']!;
-      });
-    }
   }
 
   // --- FULLY WORKING LOGOUT ---
@@ -40,18 +55,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text("Cancel"),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               // 1. Close the dialog first
               Navigator.pop(context);
 
               // 2. Clear all screens and go to Login
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                    (route) => false, // This deletes the history so they can't go "back"
-              );
+              await FirebaseAuth.instance.signOut();
+              if (mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) =>
+                      false, // This deletes the history so they can't go "back"
+                );
+              }
             },
-            child: const Text("Logout", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            child: const Text("Logout",
+                style:
+                    TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -75,11 +96,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const CircleAvatar(
                     radius: 50,
                     backgroundColor: Colors.white,
-                    child: Icon(Icons.person, size: 50, color: darkNavy)
-                ),
+                    child: Icon(Icons.person, size: 50, color: darkNavy)),
                 const SizedBox(height: 15),
-                Text(userName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                Text(userEmail, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                Text(userName,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold)),
+                Text(userEmail,
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 14)),
               ],
             ),
           ),
@@ -93,7 +119,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Divider(height: 1, indent: 20, endIndent: 20),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text("Logout", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            title: const Text("Logout",
+                style: TextStyle(
+                    color: Colors.redAccent, fontWeight: FontWeight.bold)),
             onTap: _logout,
           ),
         ],

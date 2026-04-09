@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/note_model.dart';
 
 class NotesScreen extends StatefulWidget {
@@ -22,32 +21,20 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 
   Future<void> _loadNotes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? saved = prefs.getString('saved_notes');
-    if (saved != null) {
-      final List<dynamic> decoded = json.decode(saved);
-      setState(() {
-        _notes = decoded.map((n) => Note(
-            id: DateTime.now().toString(),
-            title: n['title'],
-            content: n['content'],
-            subject: n['subject'] ?? "General",
-            isPinned: n['isPinned'] ?? false
-        )).toList();
-      });
-    }
-    setState(() => _loading = false);
-  }
-
-  Future<void> _saveNotes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String encoded = json.encode(_notes.map((n) => {
-      'title': n.title,
-      'content': n.content,
-      'subject': n.subject,
-      'isPinned': n.isPinned
-    }).toList());
-    await prefs.setString('saved_notes', encoded);
+    FirebaseFirestore.instance.collection('notes').snapshots().listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          _notes = snapshot.docs.map((doc) => Note(
+            id: doc.id,
+            title: doc['title'],
+            content: doc['content'],
+            subject: doc['subject'] ?? "General",
+            isPinned: doc['isPinned'] ?? false
+          )).toList();
+          _loading = false;
+        });
+      }
+    });
   }
 
   @override
@@ -221,16 +208,13 @@ class _NotesScreenState extends State<NotesScreen> {
               ),
               onPressed: () {
                 if (tC.text.isNotEmpty) {
-                  setState(() {
-                    _notes.add(Note(
-                        id: DateTime.now().toString(),
-                        title: tC.text,
-                        content: cC.text,
-                        subject: tempSub,
-                        isPinned: false
-                    ));
+                  FirebaseFirestore.instance.collection('notes').add({
+                    'title': tC.text,
+                    'content': cC.text,
+                    'subject': tempSub,
+                    'isPinned': false,
+                    'createdAt': FieldValue.serverTimestamp(),
                   });
-                  _saveNotes();
                   Navigator.pop(context);
                 }
               },

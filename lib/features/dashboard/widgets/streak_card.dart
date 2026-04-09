@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../planner/screens/planner_screen.dart'; // Import the screen you want to open
 
 class StreakCard extends StatelessWidget {
@@ -16,24 +17,34 @@ class StreakCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.local_fire_department, color: Colors.orange, size: 35),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance.collection('streak').doc('current').snapshots(),
+            builder: (context, snapshot) {
+              int streak = 0;
+              if (snapshot.hasData && snapshot.data!.exists && snapshot.data!.data() != null && (snapshot.data!.data() as Map).containsKey('activity')) {
+                List<dynamic> data = snapshot.data!['activity'];
+                streak = data.where((e) => e == true).length;
+              }
+              return Row(
                 children: [
-                  const Text(
-                    "7 Days",
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    "Study Streak",
-                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12),
+                  const Icon(Icons.local_fire_department, color: Colors.orange, size: 35),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "$streak Days",
+                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        "Study Streak",
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
+              );
+            }
           ),
 
           // --- THE FUNCTIONAL BUTTON ---

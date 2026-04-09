@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'study_streak_screen.dart';
 
 class ProgressTrackingScreen extends StatefulWidget {
@@ -9,9 +10,50 @@ class ProgressTrackingScreen extends StatefulWidget {
 }
 
 class _ProgressTrackingScreenState extends State<ProgressTrackingScreen> {
-  // Current selections for the filters and tabs
   String _currentTimeFilter = "Semester";
   String _currentTab = "Study Sessions";
+
+  int _streakDays = 0;
+  double _totalHours = 0.0;
+  int _completedAssignments = 0;
+  String _productivityStr = "0%";
+
+  @override
+  void initState() {
+    super.initState();
+
+    FirebaseFirestore.instance.collection('streak').doc('current').snapshots().listen((snapshot) {
+      if (mounted && snapshot.exists && snapshot.data()!.containsKey('activity')) {
+        List<dynamic> data = snapshot.data()!['activity'];
+        int streak = data.where((e) => e == true).length;
+        setState(() {
+          _streakDays = streak;
+        });
+      }
+    });
+
+    FirebaseFirestore.instance.collection('pomodoro').doc('stats').snapshots().listen((snapshot) {
+      if (mounted && snapshot.exists) {
+        int minutes = snapshot.data()!['minutes'] ?? 0;
+        setState(() {
+          _totalHours = minutes / 60.0;
+        });
+      }
+    });
+
+    FirebaseFirestore.instance.collection('assignments').snapshots().listen((snapshot) {
+      if (mounted && snapshot.docs.isNotEmpty) {
+        int done = snapshot.docs.where((doc) => doc['status'] == 1).length; // 1 is done index
+        int total = snapshot.docs.length;
+        setState(() {
+          _completedAssignments = done;
+          if (total > 0) {
+            _productivityStr = "${((done / total) * 100).toStringAsFixed(0)}%";
+          }
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +120,7 @@ class _ProgressTrackingScreenState extends State<ProgressTrackingScreen> {
                     icon: Icons.emoji_events_outlined,
                     iconColor: Colors.orange,
                     label: "Study Streak",
-                    value: "7 Days",
+                    value: "$_streakDays Days",
                     footer: "Keep it up! 🔥",
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const StudyStreakScreen())),
                   ),
@@ -86,7 +128,7 @@ class _ProgressTrackingScreenState extends State<ProgressTrackingScreen> {
                     icon: Icons.access_time,
                     iconColor: Colors.blue,
                     label: "Total Hours",
-                    value: "5.5h",
+                    value: "${_totalHours.toStringAsFixed(1)}h",
                     footer: "This week",
                     onTap: () => _showDetails(context, "Total Hours"),
                   ),
@@ -94,7 +136,7 @@ class _ProgressTrackingScreenState extends State<ProgressTrackingScreen> {
                     icon: Icons.check_circle_outline,
                     iconColor: Colors.green,
                     label: "Completed",
-                    value: "3",
+                    value: "$_completedAssignments",
                     footer: "Assignments",
                     onTap: () => _showDetails(context, "Completed Assignments"),
                   ),
@@ -102,7 +144,7 @@ class _ProgressTrackingScreenState extends State<ProgressTrackingScreen> {
                     icon: Icons.trending_up,
                     iconColor: Colors.purple,
                     label: "Productivity",
-                    value: "60%",
+                    value: _productivityStr,
                     footer: "Completion rate",
                     onTap: () => _showDetails(context, "Productivity Stats"),
                   ),

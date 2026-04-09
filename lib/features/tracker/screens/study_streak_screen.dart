@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class StudyStreakScreen extends StatefulWidget {
   const StudyStreakScreen({super.key});
@@ -8,8 +9,27 @@ class StudyStreakScreen extends StatefulWidget {
 }
 
 class _StudyStreakScreenState extends State<StudyStreakScreen> {
-  // Mock data for the activity grid (true = completed, false = missed)
   List<bool> activityData = List.generate(30, (index) => index >= 24);
+
+  @override
+  void initState() {
+    super.initState();
+    FirebaseFirestore.instance.collection('streak').doc('current').snapshots().listen((snapshot) {
+      if (mounted) {
+        if (snapshot.exists && snapshot.data()!.containsKey('activity')) {
+          List<dynamic> data = snapshot.data()!['activity'];
+          setState(() {
+            activityData = data.map((e) => e as bool).toList();
+          });
+        } else {
+          // Initialize in Firestore if it doesn't exist
+          FirebaseFirestore.instance.collection('streak').doc('current').set({
+            'activity': activityData
+          });
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,8 +160,10 @@ class _StudyStreakScreenState extends State<StudyStreakScreen> {
                       bool isCompleted = activityData[index];
                       return GestureDetector(
                         onTap: () {
-                          setState(() {
-                            activityData[index] = !activityData[index]; // Toggle on click
+                          List<bool> newData = List.from(activityData);
+                          newData[index] = !newData[index];
+                          FirebaseFirestore.instance.collection('streak').doc('current').update({
+                            'activity': newData
                           });
                         },
                         child: AnimatedContainer(

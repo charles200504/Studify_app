@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -61,13 +63,13 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 35),
               child: Column(
                 children: [
-                  // USERNAME FIELD
+                  // EMAIL FIELD
                   TextField(
                     controller: _usernameController,
                     decoration: InputDecoration(
-                      labelText: 'Username',
-                      hintText: 'Enter admin',
-                      prefixIcon: const Icon(Icons.person_outline),
+                      labelText: 'Email',
+                      hintText: 'Enter your email',
+                      prefixIcon: const Icon(Icons.email_outlined),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(15),
                       ),
@@ -82,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: true, // This masks the password
                     decoration: InputDecoration(
                       labelText: 'Password',
-                      hintText: 'Enter 1234',
+                      hintText: 'Enter your password',
                       prefixIcon: const Icon(Icons.lock_outline),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(15),
@@ -105,19 +107,43 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         elevation: 5,
                       ),
-                      onPressed: () {
+                      onPressed: () async {
                         // THE LOGIN LOGIC
-                        String user = _usernameController.text.trim();
+                        String email = _usernameController.text.trim();
                         String pass = _passwordController.text.trim();
 
-                        if (user == 'admin' && pass == '1234') {
-                          // SUCCESS: Go to Dashboard
-                          Navigator.pushReplacementNamed(context, '/main');
+                        if (email.isNotEmpty && pass.isNotEmpty) {
+                          try {
+                            await FirebaseAuth.instance.signInWithEmailAndPassword(
+                              email: email,
+                              password: pass,
+                            );
+                            if (mounted) {
+                              Navigator.pushReplacementNamed(context, '/main');
+                            }
+                          } on FirebaseAuthException catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(e.message ?? 'Authentication failed'),
+                                  backgroundColor: Colors.redAccent,
+                                  behavior: SnackBarBehavior.floating,
+                                  margin: const EdgeInsets.all(20),
+                                )
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
+                          }
                         } else {
                           // ERROR: Show Red Message
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Invalid Admin Credentials!'),
+                              content: Text('Please enter email and password!'),
                               backgroundColor: Colors.redAccent,
                               behavior: SnackBarBehavior.floating,
                               margin: EdgeInsets.all(20),
@@ -131,6 +157,28 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
+
+                  const SizedBox(height: 20),
+
+                  // REGISTER LINK
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text("Don't have an account?", style: TextStyle(color: Colors.grey)),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (c) => const SignupScreen()),
+                          );
+                        },
+                        child: const Text(
+                          "Sign Up",
+                          style: TextStyle(color: Color(0xFF0D2B45), fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -139,4 +187,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}
+}

@@ -1,48 +1,128 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../reminders/screens/reminders_screen.dart';
 import '../../reminders/pomodoro/timer_screen.dart';
 import '../../tracker/screens/study_streak_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   final Function(int) onSeeAllPressed;
 
-  DashboardScreen({super.key, required this.onSeeAllPressed});
+  const DashboardScreen({super.key, required this.onSeeAllPressed});
 
-  final List<Map<String, dynamic>> allTasks = [
-    {"title": "test case", "status": "Overdue", "date": "Today", "color": const Color(0xFF8EDCE6)},
-    {"title": "CGP", "status": "Pending", "date": "Today", "color": const Color(0xFF6799C1)},
-    {"title": "MAD", "status": "Pending", "date": "Today", "color": const Color(0xFF8E8CD8)},
-    {"title": "Final Project", "status": "Pending", "date": "Apr 25", "color": Colors.white},
-    {"title": "Lab Exam", "status": "Pending", "date": "May 02", "color": Colors.white},
-  ];
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  int _streakDays = 0;
+  double _totalHoursThisWeek = 0.0;
+  double _dailyGoalProgress = 0.0;
+  String _userName = "Alex";
+
+  @override
+  void initState() {
+    super.initState();
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots().listen((snapshot) {
+        if (mounted && snapshot.exists) {
+          setState(() {
+            _userName = snapshot.data()?['name']?.split(' ')[0] ?? "Alex";
+          });
+        }
+      });
+    }
+
+    FirebaseFirestore.instance.collection('streak').doc('current').snapshots().listen((snapshot) {
+      if (mounted && snapshot.exists && snapshot.data()!.containsKey('activity')) {
+        List<dynamic> data = snapshot.data()!['activity'];
+        setState(() {
+          _streakDays = data.where((e) => e == true).length;
+        });
+      }
+    });
+
+    FirebaseFirestore.instance.collection('pomodoro').doc('stats').snapshots().listen((snapshot) {
+      if (mounted && snapshot.exists) {
+        int minutes = snapshot.data()!['minutes'] ?? 0;
+        setState(() {
+          _totalHoursThisWeek = minutes / 60.0;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     const Color darkNavy = Color(0xFF0D2B45);
 
-    final todaysTasks = allTasks.where((t) => t['date'] == 'Today');
-    final upcomingDeadlines = allTasks.where((t) => t['date'] != 'Today');
-
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context, darkNavy),
-            _buildSectionTitle("Daily Goal", null),
-            _buildDailyGoalCard(),
-            _buildSectionTitle("Today's Task", () => onSeeAllPressed(2)),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('assignments').snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: darkNavy));
 
-            ...todaysTasks.map((task) => _buildTaskItem(task['title'], task['color'])),
+          final now = DateTime.now();
+          final allDocs = snapshot.data!.docs;
 
-            _buildSectionTitle("Upcoming Deadlines", null),
+          int doneTasks = 0;
+          final List<Map<String, dynamic>> todaysTasks = [];
+          final List<Map<String, dynamic>> upcomingDeadlines = [];
 
-            ...upcomingDeadlines.map((task) => _buildDeadlineItem(task['title'])),
+          for(var rawDoc in allDocs) {
+            try {
+              final doc = rawDoc.data() as Map<String, dynamic>? ?? {};
+              
+              // Handle status
+              final status = doc['status'];
+              if (status == 1 || status == "1" || status == 1.toString()) {
+                doneTasks++;
+              }
 
-            const SizedBox(height: 30),
-          ],
-        ),
+              // Handle date
+              final rawDate = doc['dueDate'];
+              DateTime dt = DateTime.now();
+              if (rawDate is Timestamp) {
+                dt = rawDate.toDate();
+              } else if (rawDate is String) {
+                dt = DateTime.parse(rawDate);
+              }
+              
+              if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+                todaysTasks.add(doc);
+              } else if (dt.isAfter(now.subtract(const Duration(days: 1)))) {
+                upcomingDeadlines.add(doc);
+              }
+            } catch(e) {
+              // Ignore malformed docs
+            }
+          }
+
+          _dailyGoalProgress = allDocs.isEmpty ? 0.0 : (doneTasks / allDocs.length);
+
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(context, darkNavy),
+                _buildSectionTitle("Daily Goal", null),
+                _buildDailyGoalCard(),
+                _buildSectionTitle("Today's Task", () => widget.onSeeAllPressed(2)),
+
+                ...todaysTasks.map((task) => _buildTaskItem(task['title']?.toString() ?? "Untitled", const Color(0xFF8EDCE6))),
+
+                _buildSectionTitle("Upcoming Deadlines", null),
+
+                ...upcomingDeadlines.map((task) => _buildDeadlineItem(task['title']?.toString() ?? "Untitled")),
+
+                const SizedBox(height: 30),
+              ],
+            ),
+          );
+        }
       ),
     );
   }
@@ -80,7 +160,7 @@ class DashboardScreen extends StatelessWidget {
     ),
     child: Column(children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Text("Good morning, Alex", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+        Text("Good morning, $_userName", style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
         Row(children: [
           IconButton(icon: const Icon(Icons.notifications_none, color: Colors.white),
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const RemindersScreen()))),
@@ -90,8 +170,8 @@ class DashboardScreen extends StatelessWidget {
       ]),
       const SizedBox(height: 25),
       Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-        _stat(context, "Study Streak", "7 Days", hasFire: true, isClickable: true),
-        _stat(context, "This week", "14.5 hrs"),
+        _stat(context, "Study Streak", "$_streakDays Days", hasFire: true, isClickable: true),
+        _stat(context, "This week", "${_totalHoursThisWeek.toStringAsFixed(1)} hrs"),
       ]),
     ]),
   );
@@ -121,10 +201,10 @@ class DashboardScreen extends StatelessWidget {
     padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(color: const Color(0xFFF5F7F9), borderRadius: BorderRadius.circular(20)),
     child: Row(children: [
-      const CircularProgressIndicator(value: 0.7, color: Color(0xFF0D2B45), backgroundColor: Colors.white),
+      CircularProgressIndicator(value: _dailyGoalProgress, color: const Color(0xFF0D2B45), backgroundColor: Colors.white),
       const SizedBox(width: 20),
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text("70% Completed", style: TextStyle(fontWeight: FontWeight.bold)),
+        Text("${(_dailyGoalProgress * 100).toStringAsFixed(0)}% Completed", style: const TextStyle(fontWeight: FontWeight.bold)),
         const Text("Keep going! You're almost there", style: TextStyle(color: Colors.grey, fontSize: 11)),
       ])
     ]),

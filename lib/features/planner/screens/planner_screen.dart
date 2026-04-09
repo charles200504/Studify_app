@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 // IMPORTANT: Make sure this path correctly points to your main_navigation.dart file
 import '../../../main_navigation.dart';
 
@@ -14,11 +15,25 @@ class _PlannerScreenState extends State<PlannerScreen> {
   DateTime _viewDate = DateTime(2026, 3, 1);
   int _selectedDay = 13;
 
-  List<Map<String, dynamic>> sessions = [
-    {"title": "Calculus Study", "duration": "2 hours", "subject": "Mathematics", "isDone": true},
-    {"title": "Essay Writing", "duration": "1 hour", "subject": "Literature", "isDone": true},
-    {"title": "Chemistry Revision", "duration": "45 min", "subject": "Chemistry", "isDone": false},
-  ];
+  List<Map<String, dynamic>> sessions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    FirebaseFirestore.instance.collection('planner_sessions').snapshots().listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          sessions = snapshot.docs.map((doc) => {
+            "id": doc.id,
+            "title": doc['title'],
+            "duration": doc['duration'],
+            "subject": doc['subject'],
+            "isDone": doc['isDone'] ?? false,
+          }).toList();
+        });
+      }
+    });
+  }
 
   int get _daysInMonth => DateUtils.getDaysInMonth(_viewDate.year, _viewDate.month);
 
@@ -224,7 +239,13 @@ class _PlannerScreenState extends State<PlannerScreen> {
             ),
           ),
           GestureDetector(
-            onTap: () => setState(() => sessions[index]['isDone'] = !isDone),
+            onTap: () {
+              if (session['id'] != null) {
+                FirebaseFirestore.instance.collection('planner_sessions').doc(session['id']).update({
+                  'isDone': !isDone
+                });
+              }
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               width: 35, height: 35,

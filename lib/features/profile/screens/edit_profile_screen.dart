@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -13,8 +15,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nameC = TextEditingController(text: "Alex Johnson");
-    _emailC = TextEditingController(text: "alex.j@study.com");
+    _nameC = TextEditingController(text: "Loading...");
+    _emailC = TextEditingController(text: "Loading...");
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      FirebaseFirestore.instance.collection('users').doc(user.uid).get().then((snapshot) {
+        if (mounted) {
+          setState(() {
+            _nameC.text = snapshot.data()?['name'] ?? "";
+            _emailC.text = snapshot.data()?['email'] ?? user.email ?? "";
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -54,11 +68,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               height: 55,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: darkNavy, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                onPressed: () {
-                  Navigator.pop(context, {
-                    'name': _nameC.text,
-                    'email': _emailC.text,
-                  });
+                onPressed: () async {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    try {
+                      // We only update the Firestore Database visual profile to avoid authentication token expirations
+
+                      // Save Profile Data
+                      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                        'name': _nameC.text,
+                        'email': _emailC.text,
+                      }, SetOptions(merge: true));
+                      
+                      if(!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile updated!"), backgroundColor: Colors.green));
+                      Navigator.pop(context);
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.redAccent));
+                    }
+                  }
                 },
                 child: const Text("Save Changes", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),

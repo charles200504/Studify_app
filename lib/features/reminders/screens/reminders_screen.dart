@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key});
@@ -30,7 +31,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       onPressed: () => Navigator.pop(context),
                     ),
                     const Text("Reminders", style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
-                    const Icon(Icons.add_circle_outline, color: Colors.white, size: 28),
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline, color: Colors.white, size: 28),
+                      onPressed: () => _showAddReminder(context),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -49,26 +53,56 @@ class _RemindersScreenState extends State<RemindersScreen> {
             ),
           ),
           // Stats Row
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildStatCard("5", "Total"),
-                _buildStatCard("2", "Study"),
-                _buildStatCard("1", "Events"),
-                _buildStatCard("2", "Tasks"),
-              ],
-            ),
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('reminders').snapshots(),
+            builder: (context, snapshot) {
+              int total = 0;
+              int high = 0;
+              if (snapshot.hasData) {
+                total = snapshot.data!.docs.length;
+                high = snapshot.data!.docs.where((doc) => doc['priority'] == 'High').length;
+              }
+              return Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildStatCard("$total", "Total"),
+                    _buildStatCard("$high", "High Prio"),
+                    _buildStatCard("${total - high}", "Normal"),
+                    _buildStatCard("0", "Events"),
+                  ],
+                ),
+              );
+            }
           ),
           // List
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: [
-                _reminderCard("Math Exam Prep", "Review Chapters 1-5", "Mar 20", "High", const Color(0xFFB8CDE1)),
-                _reminderCard("Physics Lab Due", "Submit Newton Law report", "Mar 19", "High", const Color(0xFFD9C0E0)),
-              ],
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('reminders').orderBy('createdAt', descending: true).snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                
+                final docs = snapshot.data!.docs;
+                if (docs.isEmpty) {
+                  return const Center(child: Text("No reminders.", style: TextStyle(color: Colors.grey)));
+                }
+                
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final doc = docs[index];
+                    return _reminderCard(
+                      doc['title'], 
+                      doc['description'], 
+                      doc['date'], 
+                      doc['priority'] ?? "High", 
+                      const Color(0xFFB8CDE1)
+                    );
+                  },
+                );
+              }
             ),
           ),
         ],
@@ -125,4 +159,45 @@ class _RemindersScreenState extends State<RemindersScreen> {
       ],
     ),
   );
+
+  void _showAddReminder(BuildContext context) {
+    final tC = TextEditingController();
+    final dC = TextEditingController();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Add Reminder", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            TextField(controller: tC, decoration: const InputDecoration(labelText: "Title")),
+            TextField(controller: dC, decoration: const InputDecoration(labelText: "Description")),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                if (tC.text.isNotEmpty) {
+                  final now = DateTime.now();
+                  final monthStr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][now.month - 1];
+                  FirebaseFirestore.instance.collection('reminders').add({
+                    'title': tC.text,
+                    'description': dC.text,
+                    'date': '$monthStr ${now.day}',
+                    'priority': 'High',
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text("Save"),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
 }

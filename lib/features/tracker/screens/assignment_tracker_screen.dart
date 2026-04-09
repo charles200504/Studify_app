@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/assignment_model.dart';
 import '../../../main_navigation.dart';
 
@@ -25,32 +24,36 @@ class _AssignmentTrackerScreenState extends State<AssignmentTrackerScreen> {
   }
 
   Future<void> _loadFromStorage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? saved = prefs.getString('saved_assignments');
-    if (saved != null) {
-      final List<dynamic> decoded = json.decode(saved);
-      setState(() {
-        globalAssignments = decoded.map((item) => Assignment(
-          title: item['title'],
-          subject: item['subject'] ?? "General",
-          dueDate: DateTime.parse(item['dueDate']),
-          status: AssignmentStatus.values[item['status']],
-          color: Colors.blue,
-        )).toList();
-      });
-    }
-    setState(() => _isLoading = false);
+    FirebaseFirestore.instance.collection('assignments').snapshots().listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          globalAssignments = snapshot.docs.map((rawDoc) {
+            final doc = rawDoc.data() as Map<String, dynamic>? ?? {};
+            
+            final rawDate = doc['dueDate'];
+            DateTime dt = DateTime.now();
+            try {
+              if (rawDate is Timestamp) dt = rawDate.toDate();
+              else if (rawDate is String) dt = DateTime.parse(rawDate);
+            } catch(e) {}
+            
+            return Assignment(
+              id: rawDoc.id,
+              title: doc['title']?.toString() ?? "Untitled",
+              subject: doc['subject']?.toString() ?? "General",
+              dueDate: dt,
+              status: AssignmentStatus.values[doc['status'] is int ? doc['status'] : 0],
+              color: Colors.blue,
+            );
+          }).toList();
+          _isLoading = false;
+        });
+      }
+    });
   }
 
   Future<void> _saveToStorage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String encoded = json.encode(globalAssignments.map((a) => {
-      'title': a.title,
-      'subject': a.subject,
-      'dueDate': a.dueDate.toIso8601String(),
-      'status': a.status.index,
-    }).toList());
-    await prefs.setString('saved_assignments', encoded);
+    // Deprecated for direct Firestore writes.
   }
 
   // Logic to determine display status
@@ -225,8 +228,11 @@ class _AssignmentTrackerScreenState extends State<AssignmentTrackerScreen> {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () {
-                  setState(() => a.status = AssignmentStatus.done);
-                  _saveToStorage();
+                  if (a.id != null) {
+                    FirebaseFirestore.instance.collection('assignments').doc(a.id).update({
+                      'status': AssignmentStatus.done.index,
+                    });
+                  }
                 },
                 child: const Text("Mark as Done", style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
               ),
@@ -259,14 +265,13 @@ class _AssignmentTrackerScreenState extends State<AssignmentTrackerScreen> {
             ElevatedButton(
               onPressed: () {
                 if (_taskController.text.isNotEmpty && _selectedDate != null) {
-                  setState(() => globalAssignments.add(Assignment(
-                    title: _taskController.text,
-                    subject: "General",
-                    dueDate: _selectedDate!,
-                    status: AssignmentStatus.pending,
-                    color: Colors.blue,
-                  )));
-                  _saveToStorage();
+                  FirebaseFirestore.instance.collection('assignments').add({
+                    'title': _taskController.text,
+                    'subject': "General",
+                    'dueDate': _selectedDate!.toIso8601String(),
+                    'status': AssignmentStatus.pending.index,
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
                   Navigator.pop(context);
                 }
               },

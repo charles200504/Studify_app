@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TimerScreen extends StatefulWidget {
   const TimerScreen({super.key});
@@ -16,6 +17,19 @@ class _TimerScreenState extends State<TimerScreen> {
 
   int _sessionsCompleted = 0;
   int _totalMinutes = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    FirebaseFirestore.instance.collection('pomodoro').doc('stats').snapshots().listen((snapshot) {
+      if (mounted && snapshot.exists) {
+        setState(() {
+          _sessionsCompleted = snapshot.data()?['sessions'] ?? 0;
+          _totalMinutes = snapshot.data()?['minutes'] ?? 0;
+        });
+      }
+    });
+  }
 
   void _toggleTimer() {
     if (_isRunning) {
@@ -41,6 +55,11 @@ class _TimerScreenState extends State<TimerScreen> {
       if (_currentMode == "Focus") {
         _sessionsCompleted++;
         _totalMinutes += (_totalSeconds ~/ 60);
+
+        FirebaseFirestore.instance.collection('pomodoro').doc('stats').set({
+          'sessions': _sessionsCompleted,
+          'minutes': _totalMinutes,
+        }, SetOptions(merge: true));
       }
     });
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 enum AssignmentStatus { pending, done, overdue }
 
 class Assignment {
+  String? id;
   final String title;
   final String subject;
   final DateTime dueDate;
@@ -10,6 +11,7 @@ class Assignment {
   final Color color;
 
   Assignment({
+    this.id,
     required this.title,
     required this.subject,
     required this.dueDate,
